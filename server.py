@@ -5,7 +5,7 @@ import struct
 import random
 
 serverPort = 12000
-myIP =  gethostbyname(gethostname())
+myIP = gethostbyname(gethostname())
 conns_map = {} #(connection, team name)
 g1_teams = []
 g2_teams = []
@@ -16,22 +16,21 @@ lock2 = threading.Lock() #lock for the list of group 2
 stop_threads = False 
 
 #UDP server
-def udp_server():
+def udp_server():c
     print("Server started, listening on IP address " + myIP)
     serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
     serverSocket.bind(('', serverPort))
-    broadcast = struct.pack('I B H', 0xfeedbeef, 0x2, serverPort) 
+    broadcast = struct.pack('!IBH', 0xfeedbeef, 0x2, 13117) 
+    print (broadcast)
     serverSocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     for i in range (0, 10):
         serverSocket.sendto(broadcast, ('<broadcast>', 13117))
         time.sleep(1)
-    print("done")
 
 def thread_per_client(conn, ip, port):
     try:
         while True:
             char = conn.recv(1)
-            print(char.decode())
             if g1_teams.__contains__(conn):
                 lock1.acquire()  
                 global g1_score
@@ -59,21 +58,15 @@ def tcp_server():
     tcpServer.bind((myIP, serverPort)) 
     threads = []
     startGameTime = time.time() + 10
-    print("startGameTime: " + startGameTime.__str__())
     tcpServer.settimeout(3)
     while time.time() < startGameTime:
         try:
-            print("current time: " + time.time().__str__()) 
             tcpServer.listen(4) 
-            print ("trying to connect")
             (conn, (ip,port)) = tcpServer.accept() 
-            print(ip +" - client")
+            print(ip +" - client connected")
             threads.append(threading.Thread(target= thread_per_client, args=(conn, ip, port,)))
-            #newThread = threading.Thread(target= thread_per_client, args=(conn, ip, port,))
-            #threads.append(newthread)
             team_name = conn.recv(1024)
             conns_map[conn] = team_name.decode()
-            #print(team_name)
         except:
             pass
     keys = conns_map.keys()
@@ -95,21 +88,28 @@ def tcp_server():
     for t in threads:
         t.start()
 
-
     #endGameTime = time.time() + 10
     time.sleep(10)
-    for conn in keys:
-        conn.close()
-    winner = 1
+    winner = 0
     winners_names = ""
+    end_msg = ""
+    if g1_score > g2_score:
+        winner = 1
     if g2_score > g1_score:
         winner = 2
     if winner == 1:
         winners_names = append_names(g1_teams)
     else:
         winners_names = append_names(g2_teams)
-    end_msg = "Game over!\nGroup 1 typed in " + str(g1_score) + " characters.\nGroup 2 typed in " + str(g2_score) + " characters.\nGroup " + winner.__str__() + " wins!\nCongratulations to the winners:\n==\n" + winners_names
+    if not winner == 0:
+        end_msg = "Game over!\nGroup 1 typed in " + str(g1_score) + " characters.\nGroup 2 typed in " + str(g2_score) + " characters.\nGroup " + winner.__str__() + " wins!\nCongratulations to the winners:\n==\n" + winners_names
+    else:
+        end_msg = "Game over!\nGroup 1 typed in " + str(g1_score) + " characters.\nGroup 2 typed in " + str(g2_score) + " characters.\nIt's a tie! Thank you for playing :)\n"
     print(end_msg)
+
+    for conn in keys:
+        conn.send(end_msg.encode())
+        conn.close()
     #close TCP connections
     tcpServer.close()
     print("Game over, sending out offer requests...")
@@ -122,7 +122,7 @@ while True:
     udpThread.join()
     tcpThread.join()
     serverPort = 12000
-    myIP =  gethostbyname(gethostname()) #get_if_addr('localhost')
+    myIP =  gethostbyname(gethostname()) 
     conns_map = {} #(connection, team name)
     g1_teams = []
     g2_teams = []
