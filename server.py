@@ -3,6 +3,8 @@ from socket import *
 import time
 import struct
 import random
+from scapy.all import get_if_addr
+import ipaddress
 
 class bcolors:
     HEADER = '\033[95m'
@@ -17,7 +19,7 @@ class bcolors:
 
 max_score = 0
 serverPort = 12000
-myIP = gethostbyname(gethostname())
+myIP = get_if_addr('eth2') #gethostbyname(gethostname())
 conns_map = {} #(connection, team name) map
 keys = [] #connections list
 g1_teams = [] 
@@ -36,7 +38,7 @@ def udp_server():
     broadcast = struct.pack('!IBH', 0xfeedbeef, 0x2, serverPort) #broadcast message
     serverSocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     for i in range (0, 10):
-        serverSocket.sendto(broadcast, ('172.1.0', 13117)) #send to everyone a broadcast message
+        serverSocket.sendto(broadcast, ('172.99.255.255', 13117)) #send to everyone a broadcast message
         time.sleep(1)
 
 def thread_per_client(conn, ip, port):
