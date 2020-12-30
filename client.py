@@ -4,58 +4,61 @@ import time
 import getch
 import threading
 
-#host = '127.0.1.1' #41
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 def press_chars(sock):
     try:
-        while True:
-            char = getch.getch()
+        while True: #get char from the keyboard and send to server
+            char = getch.getch() 
             sock.send(char.encode())
     except:
         pass
 
-print("Client started, listening for offer requests...")
+print(bcolors.OKBLUE + bcolors.BOLD + "Client started," + bcolors.ENDC) 
+print(bcolors.OKBLUE + "listening for offer requests..." + bcolors.ENDC)
 while True:
+    #initialize variables
     serverIP = '0'
     msgPort = 0
     #UDP
     while True:
-        try:
+        try: 
+            #waiting for a broadcast message from servers
             udpClient = socket(AF_INET, SOCK_DGRAM) 
             udpClient.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
             udpClient.bind(("", 13117))
             data, addr = udpClient.recvfrom(1024)
             (serverIP, serverPort) = addr
-            serverIP = '172.1.0.89' #just for testing
-            # (prefix, msgType, msgPort) = struct.unpack('IBH', data)
-            # if prefix != 0xfeedbeef or msgType != 2:
-            #     raise Exception
-            #msgPort = struct.unpack('>H', data[5:7])[0]
-            msgPort = 12000 #just for testing
+            (prefix, msgType, msgPort) = struct.unpack('IBH', data) 
+            if prefix != 0xfeedbeef or msgType != 2: #check if the message format isn't valid
+                raise Exception
             print("Received offer from " + serverIP + ", attempting to connect...")
             break
-        except:# expression as identifier:
-            #print(identifier)
-            print("Failed to connect to server, trying again...")
+        except:
+            #print(bcolors.FAIL + "Error occured" + bcolors.ENDC)
             pass
     #TCP
+    end_msg = ""
     try:
         tcpClient = socket(AF_INET, SOCK_STREAM) 
-        print(serverPort)
-        tcpClient.connect((serverIP, serverPort))
-        print("connected")
-        tcpClient.send("ISIS\n".encode())     
+        tcpClient.connect((serverIP, msgPort)) #create a TCP connection to a server
+        tcpClient.send("ISIS\n".encode()) #send the team name
         start_msg = tcpClient.recv(1024).decode()
         print (start_msg)
         game_thread = threading.Thread(target=press_chars, args=(tcpClient,)) #create the thread that runs the games
         game_thread.start() #start the game
-        end_msg = tcpClient.recv(1024).decode()
+        end_msg = tcpClient.recv(1024).decode() #get end game message from server
         game_thread.join()
+        print(end_msg)
     except:
-        end_msg = "receive err"
-    print(end_msg)
-    #tcpClient.close()
-    print("Server disconnected, listening for offer requests...") #game over, starting again
-
-
-#tcpClient.close() 
+        pass
+    print(bcolors.OKBLUE + "Server disconnected, listening for offer requests..." + bcolors.ENDC) #game over, starting again
