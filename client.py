@@ -22,7 +22,6 @@ def press_chars(sock):
             sock.send(char.encode())
     except:
         pass
-
 print(bcolors.OKBLUE + bcolors.BOLD + "Client started," + bcolors.ENDC) 
 print(bcolors.OKBLUE + "listening for offer requests..." + bcolors.ENDC)
 while True:
@@ -35,15 +34,17 @@ while True:
             #waiting for a broadcast message from servers
             udpClient = socket(AF_INET, SOCK_DGRAM) 
             udpClient.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-            udpClient.bind(("", 13117))
+            udpClient.bind(('172.99.255.255', 13117))
             data, addr = udpClient.recvfrom(1024)
             (serverIP, serverPort) = addr
-            (prefix, msgType, msgPort) = struct.unpack('IBH', data) 
+            (prefix, msgType, msgPort) = struct.unpack('!IBH', data) 
             if prefix != 0xfeedbeef or msgType != 2: #check if the message format isn't valid
                 raise Exception
             print("Received offer from " + serverIP + ", attempting to connect...")
+            time.sleep(0.1)
             break
         except:
+            time.sleep(0.1)
             #print(bcolors.FAIL + "Error occured" + bcolors.ENDC)
             pass
     #TCP
