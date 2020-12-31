@@ -19,7 +19,20 @@ class bcolors:
 
 max_score = 0
 serverPort = 12000
-myIP = get_if_addr('eth2') #gethostbyname(gethostname())
+clientPort = 13117
+cookie = 0xfeedbeef
+msg_type = 0x2
+msg_format = '!IBH'
+game_time = 10
+BUFFERSIZE = 1024
+maxNumOfClient = 10
+net = input("Please insert the number (2 for testing, any other character for playing)\n")
+myIP = get_if_addr('eth1')
+temp_host = get_if_addr('eth1') +'/16'
+if net == '2':
+    myIP = get_if_addr('eth2') #gethostbyname(gethostname())
+    temp_host = get_if_addr('eth2') +'/16'
+broadcast_host = str(ipaddress.ip_network(temp_host, False).broadcast_address)
 conns_map = {} #(connection, team name) map
 keys = [] #connections list
 g1_teams = [] 
@@ -34,11 +47,11 @@ def udp_server():
     print(bcolors.HEADER + bcolors.BOLD + "Server started," + bcolors.ENDC)
     print(bcolors.HEADER + "listening on IP address " + myIP + bcolors.ENDC)
     serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-    serverSocket.bind(('', serverPort))
-    broadcast = struct.pack('!IBH', 0xfeedbeef, 0x2, serverPort) #broadcast message
+    serverSocket.bind((broadcast_host, serverPort))
+    broadcast = struct.pack(msg_format, cookie, msg_type, serverPort) #broadcast message
     serverSocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
     for i in range (0, 10):
-        serverSocket.sendto(broadcast, ('172.99.255.255', 13117)) #send to everyone a broadcast message
+        serverSocket.sendto(broadcast, (broadcast_host, clientPort)) #send to everyone a broadcast message
         time.sleep(1)
 
 def thread_per_client(conn, ip, port):
@@ -71,15 +84,15 @@ def tcp_server():
     tcpServer.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) 
     tcpServer.bind((myIP, serverPort)) 
     threads = []
-    startGameTime = time.time() + 10
+    startGameTime = time.time() + game_time
     tcpServer.settimeout(3)
     while time.time() < startGameTime: #runs this loop for 10 seconds
         try:
-            tcpServer.listen(4) 
+            tcpServer.listen(maxNumOfClient) 
             (conn, (ip,port)) = tcpServer.accept() #waiting for clients to connect
             print("client on IP " + ip + " has connected")
             threads.append(threading.Thread(target= thread_per_client, args=(conn, ip, port,))) #creates thread for the current client
-            team_name = conn.recv(1024) #get the client's team name
+            team_name = conn.recv(BUFFERSIZE) #get the client's team name
             conns_map[conn] = team_name.decode()
             keys.append(conn)
             time.sleep(0.1)
@@ -104,18 +117,18 @@ def tcp_server():
         for t in threads:
             t.start()
 
-        time.sleep(10) #game time
+        time.sleep(game_time) #game time
         #calculate the winning group
         winner = 0
         winners_names = ""
         end_msg = ""
-        averagePerSecond = g1_score/10 #average keys per second for the winning team
+        averagePerSecond = g1_score/game_time #average keys per second for the winning team
         if g1_score > g2_score:
             winner = 1
-            averagePerSecond = g1_score/10
+            averagePerSecond = g1_score/game_time
         if g2_score > g1_score:
             winner = 2
-            averagePerSecond = g2_score/10
+            averagePerSecond = g2_score/game_time
         if winner == 1:
             winners_names = append_names(g1_teams)
         else:
@@ -144,7 +157,6 @@ def tcp_server():
         tcpServer.close()
         print(bcolors.HEADER + "Game over, sending out offer requests..." + bcolors.ENDC)
     except:
-        #print (bcolors.FAIL + "Connection error" + bcolors.ENDC)
         time.sleep(0.1)
         pass
 
@@ -158,7 +170,6 @@ while True:
     tcpThread.join()
     #reset the variables for a new game
     serverPort = 12000
-    myIP =  gethostbyname(gethostname()) 
     conns_map = {} #(connection, team name)
     g1_teams = []
     g2_teams = []
